@@ -17,7 +17,7 @@ const SHOP_ITEMS = [
     name: 'TVS Boxer Motorcycle',
     category: 'Mobility',
     price: 320000,
-    desc: 'Bypass gridlock entirely. Dispatch & errand runs cost 50% less energy.',
+    desc: 'Bypass gridlock entirely. Dispatch runs cost 50% less energy.',
   },
   {
     id: 'macbook',
@@ -42,7 +42,6 @@ const SHOP_ITEMS = [
   },
 ];
 
-// Universal basic hustles for everybody
 const COMMON_HUSTLES = [
   {
     id: 'dispatch',
@@ -64,7 +63,6 @@ const COMMON_HUSTLES = [
   },
 ];
 
-// Exclusive archetype progression trees
 const PATH_SPECIFIC_HUSTLES: Record<string, any[]> = {
   STREET: [
     {
@@ -244,12 +242,89 @@ const RANDOM_EVENTS = [
   },
 ];
 
+// --- Web Audio SFX Engine ---
+function playLagosSound(type: 'cash' | 'horn' | 'whistle' | 'rest') {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+
+    if (type === 'cash') {
+      // Crisp POS transaction chime
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    } else if (type === 'horn') {
+      // Classic Danfo double horn (E-flat / B-flat brass tones)
+      const playBeep = (timeOffset: number) => {
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc1.type = 'sawtooth';
+        osc2.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(311.13, ctx.currentTime + timeOffset);
+        osc2.frequency.setValueAtTime(466.16, ctx.currentTime + timeOffset);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + timeOffset);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + timeOffset + 0.15);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        osc1.start(ctx.currentTime + timeOffset);
+        osc2.start(ctx.currentTime + timeOffset);
+        osc1.stop(ctx.currentTime + timeOffset + 0.15);
+        osc2.stop(ctx.currentTime + timeOffset + 0.15);
+      };
+      playBeep(0);
+      playBeep(0.18);
+    } else if (type === 'whistle') {
+      // Piercing agbero / officer whistle
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(2200, ctx.currentTime);
+      osc.frequency.setValueAtTime(2600, ctx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(2200, ctx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } else if (type === 'rest') {
+      // Warm recovery tone
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(329.63, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch (err) {
+    // Graceful fallback if user hasn't interacted with audio context yet
+  }
+}
+
 export default function Home() {
   const [username, setUsername] = useState('');
   const [selectedPath, setSelectedPath] = useState('STREET');
   const [player, setPlayer] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -260,6 +335,10 @@ export default function Home() {
   // Bank Form State
   const [bankAmount, setBankAmount] = useState('');
   const [repayAmount, setRepayAmount] = useState('');
+
+  const triggerSound = (type: 'cash' | 'horn' | 'whistle' | 'rest') => {
+    if (soundEnabled) playLagosSound(type);
+  };
 
   const fetchLeaderboard = async () => {
     const { data } = await supabase
@@ -339,6 +418,7 @@ export default function Home() {
     if (error) {
       setErrorMsg(error.message);
     } else {
+      triggerSound('horn');
       setPlayer(data);
       setLogs([`Arrived in Lagos with ₦50,000 cash.`]);
       fetchLeaderboard();
@@ -400,10 +480,17 @@ export default function Home() {
       
       if (triggeredEvent) {
         setActiveEvent(triggeredEvent);
+        if (triggeredEvent.type === 'danger') {
+          triggerSound('whistle');
+        } else {
+          triggerSound('cash');
+        }
         const effectStr = triggeredEvent.cashDelta !== 0 
           ? `${triggeredEvent.cashDelta > 0 ? '+₦' : '-₦'}${Math.abs(triggeredEvent.cashDelta).toLocaleString()}` 
           : `${triggeredEvent.energyDelta} Energy`;
         newLog = `🚨 [LAGOS FACTOR] ${triggeredEvent.title} (${effectStr}) | ` + newLog;
+      } else {
+        triggerSound('cash');
       }
 
       setLogs((prev) => [newLog, ...prev]);
@@ -450,6 +537,7 @@ export default function Home() {
     if (assetErr) {
       setLogs((prev) => [`❌ Asset register error: ${assetErr.message}`, ...prev]);
     } else {
+      triggerSound('horn');
       setPlayer(updatedPlayerData);
       setAssets((prev) => [...prev, newAsset]);
       setLogs((prev) => [`🎉 ASSET ACQUIRED: ${item.name}! Perk active.`, ...prev]);
@@ -480,6 +568,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('rest');
       setPlayer(data);
       setLogs((prev) => [`💤 Rested up. Recovered +30 Energy.`, ...prev]);
     }
@@ -507,6 +596,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Bank Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('cash');
       setPlayer(data);
       setBankAmount('');
       setLogs((prev) => [`🏦 Saved ₦${amt.toLocaleString()} safely in the vault.`, ...prev]);
@@ -536,6 +626,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Bank Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('cash');
       setPlayer(data);
       setBankAmount('');
       setLogs((prev) => [`🏧 Withdrew ₦${amt.toLocaleString()} liquid cash.`, ...prev]);
@@ -570,6 +661,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Repayment Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('cash');
       setPlayer(data);
       setRepayAmount('');
       setLogs((prev) => [`💳 Cleared ₦${payOff.toLocaleString()} debt! Remaining: ₦${Number(data.debt).toLocaleString()}`, ...prev]);
@@ -595,6 +687,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Loan Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('whistle');
       setPlayer(data);
       setLogs((prev) => [
         `⚠️ Borrowed ₦${loanAmt.toLocaleString()}. Debt increased to ₦${Number(data.debt).toLocaleString()} (25% fee).`,
@@ -640,6 +733,7 @@ export default function Home() {
     if (error) {
       setLogs((prev) => [`❌ Error: ${error.message}`, ...prev]);
     } else {
+      triggerSound('horn');
       setPlayer(data);
       setLogs((prev) => [
         `🌅 Day ${nextDay} reached! Daily sustenance burn: -₦${DAILY_BURN.toLocaleString()} | Energy restored to ${maxEnergy}.${debtPenaltyLog}`,
@@ -650,7 +744,6 @@ export default function Home() {
     setActionLoading(false);
   };
 
-  // Compile active hustles: common + current path
   const activePathHustles = player && PATH_SPECIFIC_HUSTLES[player.path] 
     ? PATH_SPECIFIC_HUSTLES[player.path] 
     : [];
@@ -669,17 +762,25 @@ export default function Home() {
       <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl space-y-6">
         
         {/* Header */}
-        <div className="text-center space-y-1">
+        <div className="space-y-1">
           <div className="flex justify-between items-center text-xs text-neutral-400 font-semibold px-1">
             <span className="text-emerald-400 uppercase tracking-widest">The Hustle Engine</span>
-            {player && (
-              <span className="bg-neutral-800 border border-neutral-700 px-2.5 py-0.5 rounded-full text-amber-300">
-                Day {player.day_count ?? 1}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="bg-neutral-800 border border-neutral-700 px-2 py-0.5 rounded-full text-[11px] text-neutral-300 hover:text-white transition"
+              >
+                {soundEnabled ? '🔊 Audio ON' : '🔇 Muted'}
+              </button>
+              {player && (
+                <span className="bg-neutral-800 border border-neutral-700 px-2.5 py-0.5 rounded-full text-amber-300">
+                  Day {player.day_count ?? 1}
+                </span>
+              )}
+            </div>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Welcome to Lagos</h1>
-          <p className="text-sm text-neutral-400">Street smarts, raw execution, compound capital.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-center">Welcome to Lagos</h1>
+          <p className="text-sm text-neutral-400 text-center">Street smarts, raw execution, compound capital.</p>
         </div>
 
         {player ? (
