@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import dynamic from 'next/dynamic';
+
+const DanfoScene = dynamic(() => import('./DanfoScene'), { ssr: false });
 
 const PATHS = [
   { id: 'STREET', name: 'STREET', desc: 'Small hustle. Quick cash, high risk, raw survival.' },
@@ -856,7 +859,8 @@ export default function Home() {
                 <p className="text-xs opacity-90">{activeEvent.text}</p>
               </div>
             )}
-
+            {/* 3D Lagos Scene */}
+            <DanfoScene />
             {/* Daily Actions & Hustles */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
